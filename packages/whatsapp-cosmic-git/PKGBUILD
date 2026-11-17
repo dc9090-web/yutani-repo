@@ -1,0 +1,48 @@
+# Maintainer: dc9090-web <295282733+dc9090-web@users.noreply.github.com>
+pkgname=whatsapp-cosmic-git
+_pkgname=whatsapp-cosmic
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Unofficial native WhatsApp client for the COSMIC desktop"
+arch=('x86_64')
+license=('GPL-3.0-or-later')
+# libopus is linked statically (audiopus_sys); rodio/cpal link libasound.
+depends=(gcc-libs glibc libxkbcommon wayland alsa-lib openssl noto-fonts-emoji)
+makedepends=(rust cargo git just cmake)
+provides=("$_pkgname")
+conflicts=("$_pkgname")
+options=('!lto')
+# Builds the latest commit from GitHub.
+url="https://github.com/dc9090-web/whatsapp"
+source=("$_pkgname::git+https://github.com/dc9090-web/whatsapp.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$_pkgname"
+  printf "0.1.0.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+}
+
+prepare() {
+  cd "$_pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$_pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --release --locked -p wa-app
+}
+
+check() {
+  cd "$_pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo test --release --locked -p wa-core
+}
+
+package() {
+  cd "$_pkgname"
+  CARGO_TARGET_DIR=target DESTDIR="$pkgdir" just install
+}

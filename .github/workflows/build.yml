@@ -1,0 +1,60 @@
+name: Build repo
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 * * * *" # hourly: picks up new upstream commits and releases
+  workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild every package
+        type: boolean
+        default: false
+  repository_dispatch:
+    types: [upstream-updated]
+
+concurrency:
+  group: build-repo
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    steps:
+      - name: Prepare system
+        run: |
+          pacman -Syu --noconfirm --needed git github-cli pacman-contrib rust
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+          # Use every core; skip the -debug split packages.
+          sed -i "s/^#\?MAKEFLAGS=.*/MAKEFLAGS=\"-j$(nproc)\"/" /etc/makepkg.conf
+          sed -i "/^OPTIONS=/s/ debug/ !debug/" /etc/makepkg.conf
+          grep -E "^(MAKEFLAGS|OPTIONS)=" /etc/makepkg.conf
+          df -h /
+
+      - uses: actions/checkout@v4
+
+      - name: Build and publish
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          FORCE: ${{ inputs.force && '1' || '0' }}
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          chown -R builder: "$GITHUB_WORKSPACE"
+          sudo -u builder -H \
+            --preserve-env=GH_TOKEN,GPG_PRIVATE_KEY,GITHUB_REPOSITORY,GITHUB_WORKSPACE,GITHUB_ACTIONS,FORCE \
+            bash -c '
+              set -euo pipefail
+              git config --global --add safe.directory "$GITHUB_WORKSPACE"
+              printf "%s\n" "$GPG_PRIVATE_KEY" | gpg --batch --import
+              export GPGKEY=$(gpg --list-secret-keys --with-colons | awk -F: "/^fpr/{print \$10; exit}")
+              unset GPG_PRIVATE_KEY
+              cd "$GITHUB_WORKSPACE"
+              ./build.sh
+            '

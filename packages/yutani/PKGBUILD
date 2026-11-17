@@ -1,0 +1,92 @@
+# Maintainer: Daniel <dc@ftlgroup.co>
+#
+# Builds the latest commit of Yutani from GitHub.
+# The package owns the binaries, the icons, both desktop entries and the
+# daemon's systemd *user* unit. Per user, afterwards:
+#     systemctl --user enable --now yutani
+#     yutani shortcuts install
+#     Settings → Desktop → Panel → Applets → add "Yutani"
+
+pkgname=yutani
+pkgver=0.4.1.r391.g4044150
+pkgrel=1
+pkgdesc="Live thumbnails, hotkeys and a panel applet for EVE Online on COSMIC"
+arch=('x86_64')
+url="https://github.com/dc9090-web/yutani"
+license=('GPL-3.0-only')
+depends=(
+  'cosmic-panel'            # hosts the applet
+  'cosmic-comp'             # the layer-shell and screencopy protocols the daemon needs
+  'xdg-desktop-portal-cosmic' # the folder chooser in the settings window
+  'systemd'                 # systemctl, busctl, systemd-run
+  'curl'                    # ESI character names
+  'hicolor-icon-theme'
+  'mesa'                    # libgbm and the EGL the GPU thumbnail pass loads
+  'vulkan-icd-loader'       # wgpu
+  'libdrm'
+  'libxkbcommon'
+  'expat'
+  'gcc-libs'
+)
+makedepends=('rust' 'git')
+optdepends=('steam: launch EVE through `yutani launch -- %command%`')
+source=("$pkgname::git+https://github.com/dc9090-web/yutani.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$pkgname"
+  printf '0.4.1.r%s.g%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+  cd "$pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd "$pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release
+}
+
+check() {
+  cd "$pkgname"
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --frozen --release
+}
+
+package() {
+  cd "$pkgname"
+  install -Dm755 target/release/yutani "$pkgdir/usr/bin/yutani"
+  install -Dm755 target/release/yutani-applet "$pkgdir/usr/bin/yutani-applet"
+
+  # The icon theme, laid out as src/assets.rs::ICONS lays it out.
+  local icons="$pkgdir/usr/share/icons/hicolor"
+  install -Dm644 assets/icons/yutani-symbolic.svg    "$icons/symbolic/status/yutani-symbolic.svg"
+  install -Dm644 assets/icons/yutani-symbolic-16.svg "$icons/16x16/status/yutani-symbolic.svg"
+  install -Dm644 assets/icons/yutani.svg             "$icons/scalable/apps/yutani.svg"
+  install -Dm644 assets/icons/yutani-48.svg          "$icons/48x48/apps/yutani.svg"
+  install -Dm644 assets/icons/yutani-32.svg          "$icons/32x32/apps/yutani.svg"
+  # The EVE launcher's and client's dock icons (src/assets.rs::EVE_ICONS).
+  local app size
+  for app in launcher client; do
+    for size in 512 256 128 64 48 32; do
+      install -Dm644 "assets/icons/eve-$app-$size.png" "$icons/${size}x${size}/apps/yutani-eve-$app.png"
+    done
+  done
+
+  # The applet entry cosmic-panel lists, and the Applications launcher.
+  install -Dm644 packaging/com.yutani.Applet.desktop "$pkgdir/usr/share/applications/com.yutani.Applet.desktop"
+  install -Dm644 packaging/com.yutani.Yutani.desktop "$pkgdir/usr/share/applications/com.yutani.Yutani.desktop"
+  # Hidden entries that lend EVE's own windows those icons in the dock.
+  install -Dm644 packaging/com.yutani.EveLauncher.desktop "$pkgdir/usr/share/applications/com.yutani.EveLauncher.desktop"
+  install -Dm644 packaging/com.yutani.EveClient.desktop "$pkgdir/usr/share/applications/com.yutani.EveClient.desktop"
+
+  # The daemon's user unit: `systemctl --user enable --now yutani`.
+  install -Dm644 packaging/yutani.service "$pkgdir/usr/lib/systemd/user/yutani.service"
+
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}

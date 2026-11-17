@@ -1,0 +1,7 @@
+/out/
+/.srcdest/
+packages/*/src/
+packages/*/pkg/
+packages/*/*/
+*.pkg.tar.*
+*.log
