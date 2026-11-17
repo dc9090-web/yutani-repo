@@ -2,7 +2,7 @@
 pkgname=whatsapp-cosmic-git
 _pkgname=whatsapp-cosmic
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Unofficial native WhatsApp client for the COSMIC desktop"
 arch=('x86_64')
 license=('GPL-3.0-or-later')
@@ -25,12 +25,14 @@ pkgver() {
 prepare() {
   cd "$_pkgname"
   export RUSTUP_TOOLCHAIN=stable
+  export CMAKE_POLICY_VERSION_MINIMUM=3.5  # bundled opus predates CMake 4
   cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
 }
 
 build() {
   cd "$_pkgname"
   export RUSTUP_TOOLCHAIN=stable
+  export CMAKE_POLICY_VERSION_MINIMUM=3.5  # bundled opus predates CMake 4
   export CARGO_TARGET_DIR=target
   cargo build --release --locked -p wa-app
 }
@@ -38,6 +40,7 @@ build() {
 check() {
   cd "$_pkgname"
   export RUSTUP_TOOLCHAIN=stable
+  export CMAKE_POLICY_VERSION_MINIMUM=3.5  # bundled opus predates CMake 4
   export CARGO_TARGET_DIR=target
   cargo test --release --locked -p wa-core
 }
