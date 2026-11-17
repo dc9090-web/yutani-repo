@@ -64,8 +64,9 @@ cd "$OUT"
 repo-add --sign --key "$GPGKEY" "$REPO_NAME.db.tar.gz" "${built[@]}"
 # pacman fetches $repo.db / $repo.files; release assets cannot be symlinks.
 for db in db files; do
-  cp -fL "$REPO_NAME.$db.tar.gz" "$REPO_NAME.$db"
-  cp -fL "$REPO_NAME.$db.tar.gz.sig" "$REPO_NAME.$db.sig"
+  rm -f "$REPO_NAME.$db" "$REPO_NAME.$db.sig"
+  cp "$REPO_NAME.$db.tar.gz" "$REPO_NAME.$db"
+  cp "$REPO_NAME.$db.tar.gz.sig" "$REPO_NAME.$db.sig"
 done
 
 uploads=()
