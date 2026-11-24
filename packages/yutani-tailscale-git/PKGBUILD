@@ -1,0 +1,63 @@
+# Maintainer: dc9090-web <noreply@github.com>
+#
+# The Yutani Tailscale applet, built from the latest commit of the
+# `tailscale-applet` branch of yutani-sysmon. It is here so the applet can be
+# installed and tried before it ships in a yutani-sysmon release; once it
+# does, `yutani-tailscale` joins the yutani-applets split package and this
+# one goes away (it already conflicts with and provides that name).
+#
+# After installing: Settings → Desktop → Panel → Applets → "Yutani Tailscale",
+# and once per machine: sudo tailscale set --operator=$USER
+
+pkgname=yutani-tailscale-git
+pkgver=0.3.1.r31.g1d2a345
+pkgrel=1
+pkgdesc='Yutani Tailscale: status, on/off switch, exit-node picker and device list (COSMIC applet)'
+arch=(x86_64)
+url='https://github.com/dc9090-web/yutani-sysmon'
+license=(GPL-3.0-or-later)
+depends=(libxkbcommon gcc-libs glibc)
+makedepends=(cargo git pkgconf wayland)
+optdepends=('tailscale: the daemon this applet talks to')
+provides=(yutani-tailscale)
+conflicts=(yutani-tailscale)
+options=(!lto)
+source=("yutani-sysmon::git+https://github.com/dc9090-web/yutani-sysmon.git#branch=tailscale-applet")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd yutani-sysmon
+  local base
+  base=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
+  printf '%s.r%s.g%s' "$base" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+  cd yutani-sysmon
+  export RUSTUP_TOOLCHAIN=stable
+  cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+  cd yutani-sysmon
+  export RUSTUP_TOOLCHAIN=stable
+  export CARGO_TARGET_DIR=target
+  cargo build --frozen --release -p cosmic-applet-tailscale
+}
+
+check() {
+  cd yutani-sysmon
+  export RUSTUP_TOOLCHAIN=stable
+  cargo test --frozen -p cosmic-applet-tailscale
+}
+
+package() {
+  cd yutani-sysmon
+  install -Dm0755 target/release/cosmic-applet-tailscale -t "$pkgdir/usr/bin"
+  install -Dm0644 crates/tailscale/resources/io.github.dc.CosmicAppletTailscale.desktop -t "$pkgdir/usr/share/applications"
+  local i
+  for i in off connecting on exit; do
+    install -Dm0644 "crates/tailscale/resources/icons/tailscale-mesh-$i-symbolic.svg" -t "$pkgdir/usr/share/icons/hicolor/scalable/apps"
+  done
+  install -Dm0644 LICENSE -t "$pkgdir/usr/share/licenses/$pkgname"
+}
