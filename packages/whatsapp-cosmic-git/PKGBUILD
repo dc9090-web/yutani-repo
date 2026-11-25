@@ -1,13 +1,14 @@
 # Maintainer: dc9090-web <295282733+dc9090-web@users.noreply.github.com>
 pkgname=whatsapp-cosmic-git
 _pkgname=whatsapp-cosmic
-pkgver=0.1.0
-pkgrel=2
+pkgver=0.2.0
+pkgrel=1
 pkgdesc="Unofficial native WhatsApp client for the COSMIC desktop"
 arch=('x86_64')
 license=('GPL-3.0-or-later')
 # libopus is linked statically (audiopus_sys); rodio/cpal link libasound.
 depends=(gcc-libs glibc libxkbcommon wayland alsa-lib openssl noto-fonts-emoji)
+optdepends=('ffmpeg: play videos and GIFs in the app')
 makedepends=(rust cargo git just cmake)
 provides=("$_pkgname")
 conflicts=("$_pkgname")
@@ -19,7 +20,10 @@ sha256sums=('SKIP')
 
 pkgver() {
   cd "$_pkgname"
-  printf "0.1.0.r%s.g%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
+  # The app's own version (Cargo.toml), so this never needs editing by hand.
+  local version
+  version=$(sed -n '/^\[workspace.package\]/,/^\[workspace.dep/s/^version = "\(.*\)"/\1/p' Cargo.toml)
+  printf "%s.r%s.g%s" "$version" "$(git rev-list --count HEAD)" "$(git rev-parse --short=7 HEAD)"
 }
 
 prepare() {
